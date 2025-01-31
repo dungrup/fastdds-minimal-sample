@@ -1,0 +1,5 @@
+struct Minimal
+{
+    unsigned long index;
+    sequence<octet> img_data;
+};
