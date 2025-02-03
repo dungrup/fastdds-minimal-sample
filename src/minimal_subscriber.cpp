@@ -15,8 +15,12 @@
 #include <fastdds/dds/subscriber/SampleInfo.hpp>
 #include <fastdds/dds/subscriber/Subscriber.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
+#include <fastdds/rtps/attributes/BuiltinTransports.hpp>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.hpp>
+
 
 using namespace eprosima::fastdds::dds;
+using namespace eprosima::fastdds::rtps;
 
 class MinimalSubscriber
 {
@@ -114,9 +118,18 @@ class MinimalSubscriber
         // Init subscriber
         bool init()
         {
-            // Create the participant
-            DomainParticipantQos pqos;
+            // Explicitly create the shared memory transport
+            DomainParticipantQos pqos = PARTICIPANT_QOS_DEFAULT;
             pqos.name("Participant_subscriber");
+            pqos.transport().use_builtin_transports = false;
+
+            std::shared_ptr<SharedMemTransportDescriptor> shm_transport =
+                    std::make_shared<SharedMemTransportDescriptor>();
+            shm_transport->segment_size(1920*1280*10);                  // Tuned:10 images of 1920x1280 pixels
+            
+            pqos.transport().user_transports.push_back(shm_transport);
+            
+            // Create the participant
             participant_ = DomainParticipantFactory::get_instance()->create_participant(0, pqos);
 
             if (participant_ == nullptr)
@@ -160,7 +173,7 @@ class MinimalSubscriber
         {
             while (listener_.samples_ < samples)
             {
-                // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
         }
 
@@ -172,7 +185,7 @@ int main(int argc, char** argv)
     MinimalSubscriber subscriber;
     if (subscriber.init())
     {
-        subscriber.run(15);
+        subscriber.run(10);
     }
     return 0;
 }

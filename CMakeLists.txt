@@ -27,7 +27,7 @@ message(STATUS "Configuring Minimal publisher/subscriber example...")
 file(GLOB MINIMAL_DDS_SOURCES_CXX "src/*.cxx")
 
 add_executable(DDSMinimalPublisher  src/minimal_publisher.cpp ${MINIMAL_DDS_SOURCES_CXX})
-target_link_libraries(DDSMinimalPublisher fastcdr fastdds)
+target_link_libraries(DDSMinimalPublisher fastdds fastcdr)
 
 add_executable(DDSMinimalSubscriber src/minimal_subscriber.cpp ${MINIMAL_DDS_SOURCES_CXX})
-target_link_libraries(DDSMinimalSubscriber fastcdr fastdds)
+target_link_libraries(DDSMinimalSubscriber fastdds fastcdr)

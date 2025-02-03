@@ -13,8 +13,11 @@
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 #include <fastdds/dds/publisher/Publisher.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
+#include <fastdds/rtps/attributes/BuiltinTransports.hpp>
+#include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.hpp>
 
 using namespace eprosima::fastdds::dds;
+using namespace eprosima::fastdds::rtps;
 
 class MinimalPublisher
 {
@@ -93,12 +96,21 @@ class MinimalPublisher
         //!Initialize the publisher
         bool init()
         {
-            minimal_.index(0);
-            // minimal_.img_data(nullptr);
-
-            // Create the participant
-            DomainParticipantQos pqos;
+            // Explicitly create the shared memory transport
+            DomainParticipantQos pqos = PARTICIPANT_QOS_DEFAULT;
             pqos.name("Participant_pub");
+            pqos.transport().use_builtin_transports = false;
+            
+            minimal_.index(0);
+            // minimal_.img_data(NULL);
+
+            std::shared_ptr<SharedMemTransportDescriptor> shm_transport =
+                    std::make_shared<SharedMemTransportDescriptor>();
+            shm_transport->segment_size(1920*1280*10);                  // Tuned:10 images of 1920x1280 pixels
+            
+            pqos.transport().user_transports.push_back(shm_transport);
+            
+            // Create the participant
             participant_ = DomainParticipantFactory::get_instance()->create_participant(0, pqos);
 
             if (participant_ == nullptr)
@@ -136,24 +148,11 @@ class MinimalPublisher
         }
 
         //!Send a publication
-        bool publish(const std::string& path)
+        bool publish(std::ifstream& file, size_t size)
         {
-            // Read the image data from the file
-            std::ifstream file(path);
-            if (!file.is_open())
-            {
-                std::cout << "Error opening file" << std::endl;
-                return false;
-            }
-
-            file.seekg(0, std::ios::end);
-            size_t size = file.tellg();
-            file.seekg(0, std::ios::beg);
-
             // Allocate memory for the data
             minimal_.img_data().resize(size);
             file.read((char*)minimal_.img_data().data(), size);
-            file.close();
 
             if (listner_.matched_ > 0)
             {
@@ -170,9 +169,20 @@ class MinimalPublisher
             uint32_t samples_sent = 0;
             const std::string path = "./img.png";
 
+            // Read the image data from the file
+            std::ifstream file(path);
+            if (!file.is_open())
+            {
+                std::cout << "Error opening file" << std::endl;
+            }
+
+            file.seekg(0, std::ios::end);
+            size_t size = file.tellg();
+            file.seekg(0, std::ios::beg);
+
             while (samples_sent < samples)
             {
-                if (publish(path))
+                if (publish(file, size))
                 {
                     samples_sent++;
                     std::cout << "Image with index: " << minimal_.index()
@@ -180,13 +190,15 @@ class MinimalPublisher
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
+
+            file.close();
         }
 };
 
 int main(int argc, char** argv)
 {
     std::cout << "Starting MinimalPublisher" << std::endl;
-    int samples = 15;
+    int samples = 10;
 
     MinimalPublisher* mypub = new MinimalPublisher();
     if (mypub->init())
