@@ -1,5 +1,6 @@
 struct Minimal
 {
     unsigned long index;
+    unsigned long time_stamp;
     sequence<octet> img_data;
 };

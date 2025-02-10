@@ -6,6 +6,8 @@
 #include <chrono>
 #include <thread>
 #include <fstream>
+#include <sys/time.h>
+#include <time.h>
 
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
@@ -17,10 +19,20 @@
 #include <fastdds/dds/topic/TypeSupport.hpp>
 #include <fastdds/rtps/attributes/BuiltinTransports.hpp>
 #include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.hpp>
+#include <fastdds/rtps/transport/TCPv4TransportDescriptor.hpp>
+#include <fastdds/rtps/transport/TCPv6TransportDescriptor.hpp>
+#include <fastdds/rtps/transport/UDPv4TransportDescriptor.hpp>
+#include <fastdds/rtps/transport/UDPv6TransportDescriptor.hpp>
 
+#define SHM_SEGMENT_SIZE 1920*1280*10   // Tuned:10 images of 1920x1280 pixels
+#define UDP_BUF_SIZE 1920*1280*10
+#define SHM_TRANSPORT 1         // Uses data sharing as well (check rqos.data_sharing().automatic();) 
+#define UDP_TRANSPORT 0
+#define LARGE_TRANSPORT 0
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastdds::rtps;
+
 
 class MinimalSubscriber
 {
@@ -69,13 +81,17 @@ class MinimalSubscriber
                     DataReader* reader) override
             {
                 SampleInfo info;
+                struct timeval time_val;
                 if (reader->take_next_sample(&minimal_, &info) == eprosima::fastdds::dds::RETCODE_OK)
                 {
                     if (info.valid_data)
                     {
                         samples_++;
-                        std::cout << "Image with index: " << minimal_.index()
-                                  << " RECEIVED." << std::endl;
+                        gettimeofday(&time_val, NULL);
+                        auto now = time_val.tv_sec * 1000.0 + time_val.tv_usec / 1000.0;
+                        auto latency = now - minimal_.time_stamp();
+                        std::cout << "[" << minimal_.time_stamp() <<"] Image with index: " << minimal_.index()
+                                  << " RECEIVED, latency: " << latency << " ms" << std::endl;
                         
                         // Save the image data to a file
                         // std::string filename = "/home/dungrup/ext-vol/dds_ws/dest_dir/received_image_" + std::to_string(minimal_.index()) + ".png";
@@ -83,6 +99,12 @@ class MinimalSubscriber
                         // std::ofstream file(filename, std::ios::binary);
                         // file.write((char*)minimal_.img_data().data(), minimal_.img_data().size());
                         // file.close();
+
+                        // Save the latency to a file
+                        std::ofstream latency_file_;
+                        latency_file_.open("latency.csv", std::ofstream::out | std::ofstream::app);
+                        latency_file_ << now << "," << minimal_.time_stamp() << std::endl;
+                        latency_file_.close();
                     }
                 }
             }
@@ -123,11 +145,26 @@ class MinimalSubscriber
             pqos.name("Participant_subscriber");
             pqos.transport().use_builtin_transports = false;
 
+            #if SHM_TRANSPORT
             std::shared_ptr<SharedMemTransportDescriptor> shm_transport =
                     std::make_shared<SharedMemTransportDescriptor>();
-            shm_transport->segment_size(1920*1280*10);                  // Tuned:10 images of 1920x1280 pixels
+            shm_transport->segment_size(SHM_SEGMENT_SIZE);               
             
             pqos.transport().user_transports.push_back(shm_transport);
+            #endif
+
+            #if UDP_TRANSPORT
+            auto udp_transport = std::make_shared<UDPv4TransportDescriptor>();
+            udp_transport->sendBufferSize = UDP_BUF_SIZE;
+            udp_transport->receiveBufferSize = UDP_BUF_SIZE;
+            udp_transport->non_blocking_send = true;
+            pqos.transport().user_transports.push_back(udp_transport);
+            #endif
+
+            #if LARGE_DATA
+            pqos.transport().use_builtin_transports = true;
+            pqos.setup_transports(BuiltinTransports::LARGE_DATA);
+            #endif  
             
             // Create the participant
             participant_ = DomainParticipantFactory::get_instance()->create_participant(0, pqos);
@@ -157,6 +194,10 @@ class MinimalSubscriber
             }
 
             // Create the DataReader
+            #if SHM_TRANSPORT
+            DataReaderQos rqos = DATAREADER_QOS_DEFAULT;
+            rqos.data_sharing().automatic();
+            #endif
             reader_ = subscriber_->create_datareader(topic_, DATAREADER_QOS_DEFAULT, &listener_);
 
             if (reader_ == nullptr)

@@ -7,7 +7,7 @@ This repository implements a simple FastDDS publisher and subscriber to transpor
 
 ## How to use this
 
-- The [Minimal.idl](./src/Minimal.idl) defines the message data structure for this example. We will need to generate the associated support files for this message type by using FastDDSGen
+- The [Minimal.idl](./src/Minimal.idl) defines the message data structure for this example. We will need to generate the associated support files for this message type by using FastDDSGen. (If you want to define your own .idl file)
 
 ```
 <path/to/Fast DDS-Gen>/scripts/fastddsgen Minimal.idl
@@ -25,3 +25,7 @@ cmake --build .
 ./DDSMinimalPublisher
 ./DDSMinimalSubscriber
 ```
+
+## Updates
+
+02/10/2025: Samples now have macros to enable/disable different transport methods
