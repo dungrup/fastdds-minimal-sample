@@ -88,8 +88,8 @@ class MinimalSubscriber
                     {
                         samples_++;
                         gettimeofday(&time_val, NULL);
-                        auto now = time_val.tv_sec * 1000.0 + time_val.tv_usec / 1000.0;
-                        auto latency = now - minimal_.time_stamp();
+                        unsigned long now = time_val.tv_usec;
+                        auto latency = (now - minimal_.time_stamp()) / 1000.0;
                         std::cout << "[" << minimal_.time_stamp() <<"] Image with index: " << minimal_.index()
                                   << " RECEIVED, latency: " << latency << " ms" << std::endl;
                         
@@ -161,7 +161,7 @@ class MinimalSubscriber
             pqos.transport().user_transports.push_back(udp_transport);
             #endif
 
-            #if LARGE_DATA
+            #if LARGE_TRANSPORT
             pqos.transport().use_builtin_transports = true;
             pqos.setup_transports(BuiltinTransports::LARGE_DATA);
             #endif  
@@ -195,10 +195,13 @@ class MinimalSubscriber
 
             // Create the DataReader
             #if SHM_TRANSPORT
-            DataReaderQos rqos = DATAREADER_QOS_DEFAULT;
-            rqos.data_sharing().automatic();
+            DataReaderQos reader_qos = DATAREADER_QOS_DEFAULT;
+            subscriber_->get_default_datareader_qos(reader_qos);
+            reader_qos.reliability().kind = ReliabilityQosPolicyKind::RELIABLE_RELIABILITY_QOS;
+            reader_qos.durability().kind = DurabilityQosPolicyKind::TRANSIENT_LOCAL_DURABILITY_QOS;
+            reader_qos.data_sharing().automatic();
             #endif
-            reader_ = subscriber_->create_datareader(topic_, DATAREADER_QOS_DEFAULT, &listener_);
+            reader_ = subscriber_->create_datareader(topic_, reader_qos, &listener_);
 
             if (reader_ == nullptr)
             {
@@ -224,9 +227,11 @@ int main(int argc, char** argv)
 {
     std::cout << "Starting subscriber." << std::endl;
     MinimalSubscriber subscriber;
+    int samples = 10;
+
     if (subscriber.init())
     {
-        subscriber.run(10);
+        subscriber.run(samples);
     }
     return 0;
 }

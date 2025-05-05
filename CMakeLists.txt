@@ -31,3 +31,6 @@ target_link_libraries(DDSMinimalPublisher fastdds fastcdr)
 
 add_executable(DDSMinimalSubscriber src/minimal_subscriber.cpp ${MINIMAL_DDS_SOURCES_CXX})
 target_link_libraries(DDSMinimalSubscriber fastdds fastcdr)
+
+# add_executable(MultipleSubs src/multiple_subs.cpp ${MINIMAL_DDS_SOURCES_CXX})
+# target_link_libraries(MultipleSubs fastdds fastcdr)

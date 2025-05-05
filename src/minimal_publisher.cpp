@@ -26,12 +26,16 @@
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastdds::rtps;
 
-#define SHM_SEGMENT_SIZE 1920*1280*10
-#define UDP_BUF_SIZE 1920*1280*10
+#define IMG_TRANSFER 0
+
+#define DATA_SIZE 100*100
+#define SHM_SEGMENT_SIZE DATA_SIZE*10  // 10*DATA_SIZE (can be tuned)
+#define UDP_BUF_SIZE DATA_SIZE*10      // 10*DATA_SIZE (can be tuned)
+
 #define SHM_TRANSPORT 1         // Uses data sharing as well (check wqos.data_sharing().automatic();) 
 #define UDP_TRANSPORT 0
 #define LARGE_TRANSPORT 0
-#define SLEEP_TIME_MS 5000
+#define SLEEP_TIME_MS 100
 
 class MinimalPublisher
 {
@@ -131,7 +135,7 @@ class MinimalPublisher
             pqos.transport().user_transports.push_back(udp_transport);
             #endif
 
-            #if LARGE_DATA
+            #if LARGE_TRANSPORT
             pqos.transport().use_builtin_transports = true;
             pqos.setup_transports(BuiltinTransports::LARGE_DATA);
             #endif  
@@ -169,11 +173,15 @@ class MinimalPublisher
 
             // Create the DataWriter
             #if SHM_TRANSPORT
-            DataWriterQos wqos = DATAWRITER_QOS_DEFAULT;
-            wqos.data_sharing().automatic();
+            DataWriterQos writer_qos = DATAWRITER_QOS_DEFAULT;
+            publisher_->get_default_datawriter_qos(writer_qos);
+            writer_qos.reliability().kind = ReliabilityQosPolicyKind::RELIABLE_RELIABILITY_QOS;
+            writer_qos.durability().kind = DurabilityQosPolicyKind::TRANSIENT_LOCAL_DURABILITY_QOS;
+            writer_qos.history().kind = HistoryQosPolicyKind::KEEP_LAST_HISTORY_QOS;
+            writer_qos.data_sharing().automatic();
             #endif
 
-            writer_ = publisher_->create_datawriter(topic_, DATAWRITER_QOS_DEFAULT, &listner_);
+            writer_ = publisher_->create_datawriter(topic_, writer_qos, &listner_);
 
             if (writer_ == nullptr)
             {
@@ -194,7 +202,7 @@ class MinimalPublisher
             {
                 minimal_.index(minimal_.index() + 1);
                 gettimeofday(&tv, NULL);
-                auto time = tv.tv_sec * 1000.0 + tv.tv_usec / 1000.0;
+                auto time = tv.tv_usec;
                 minimal_.time_stamp(time);
                 writer_->write(&minimal_);
                 return true;
@@ -206,7 +214,12 @@ class MinimalPublisher
         void run(uint32_t samples)
         {
             uint32_t samples_sent = 0;
+            
+            #if IMG_TRANSFER
             const std::string path = "/home/dungrup/ext-vol/fastdds-minimal-sample/src/img.png";
+            #else
+            const std::string path = "/home/dungrup/ext-vol/fastdds-minimal-sample/src/dummy.bin";
+            #endif
 
             // Read the image data from the file
             std::ifstream file(path);
@@ -218,13 +231,13 @@ class MinimalPublisher
             file.seekg(0, std::ios::end);
             size_t size = file.tellg();
             file.seekg(0, std::ios::beg);
-
+            
             while (samples_sent < samples)
             {
                 if (publish(file, size))
                 {
                     samples_sent++;
-                    std::cout << "[" << minimal_.time_stamp() <<"] Image with index: " << minimal_.index()
+                    std::cout << "[" << minimal_.time_stamp() <<"] Data with index: " << minimal_.index()
                                 << " SENT" << std::endl;
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_TIME_MS));
@@ -238,6 +251,21 @@ int main(int argc, char** argv)
 {
     std::cout << "Starting MinimalPublisher" << std::endl;
     int samples = 10;
+
+    
+    // Create a dummy buffer and write it to a file
+    std::ofstream file("/home/dungrup/ext-vol/fastdds-minimal-sample/src/dummy.bin", std::ios::binary);
+    if (file.is_open())
+    {
+        std::vector<uint8_t> buffer(DATA_SIZE, 0);
+        file.write((char*)buffer.data(), DATA_SIZE);
+        file.close();
+    }
+    else
+    {
+        std::cout << "Error creating dummy file" << std::endl;
+    }
+    
 
     MinimalPublisher* mypub = new MinimalPublisher();
     if (mypub->init())

@@ -13,6 +13,12 @@ This repository implements a simple FastDDS publisher and subscriber to transpor
 <path/to/Fast DDS-Gen>/scripts/fastddsgen Minimal.idl
 ```
 
+- Publishing frequency is defined in minimal_publisher.cpp as a macro SLEEP_TIME_MS. Currently set to 100 hence all the published data may not be received by the subscriber. Tune this value accordingly. 
+
+- Number of samples transmitted by the publisher is defined in the variable 'samples' of minimal_publisher.cpp. If you change this, vary change the same variable in minimal_subscriber.cpp as well.
+
+- You may switch between transmitting an actual PNG image or create your own dummy data of variable sizes. Use the macro IMG_TRANSFER to toggle this and vary DATA_SIZE to experiment with different sizes
+
 - Now build the source files:
 
 ```
@@ -29,3 +35,4 @@ cmake --build .
 ## Updates
 
 02/10/2025: Samples now have macros to enable/disable different transport methods
+05/05/2025: Latency measurement is fixed. Updated Readme.
