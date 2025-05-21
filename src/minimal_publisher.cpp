@@ -9,6 +9,7 @@
 #include <vector>
 #include <sys/time.h>
 #include <time.h>
+#include <numeric>  // for std::iota
 
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
@@ -28,14 +29,14 @@ using namespace eprosima::fastdds::rtps;
 
 #define IMG_TRANSFER 0
 
-#define DATA_SIZE 100*100
+#define DATA_SIZE 1000*1000
 #define SHM_SEGMENT_SIZE DATA_SIZE*10  // 10*DATA_SIZE (can be tuned)
 #define UDP_BUF_SIZE DATA_SIZE*10      // 10*DATA_SIZE (can be tuned)
 
 #define SHM_TRANSPORT 1         // Uses data sharing as well (check wqos.data_sharing().automatic();) 
 #define UDP_TRANSPORT 0
 #define LARGE_TRANSPORT 0
-#define SLEEP_TIME_MS 100
+#define SLEEP_TIME_MS 1000
 
 class MinimalPublisher
 {
@@ -216,9 +217,11 @@ class MinimalPublisher
             uint32_t samples_sent = 0;
             
             #if IMG_TRANSFER
-            const std::string path = "/home/dungrup/ext-vol/fastdds-minimal-sample/src/img.png";
+            // const std::string path = "/home/dungrup/ext-vol/fastdds-minimal-sample/src/img.png";
+            const std::string path = "../src/img.png";
             #else
-            const std::string path = "/home/dungrup/ext-vol/fastdds-minimal-sample/src/dummy.bin";
+            // const std::string path = "/home/dungrup/ext-vol/fastdds-minimal-sample/src/dummy.bin";
+            const std::string path = "./dummy.bin";
             #endif
 
             // Read the image data from the file
@@ -254,10 +257,19 @@ int main(int argc, char** argv)
 
     
     // Create a dummy buffer and write it to a file
-    std::ofstream file("/home/dungrup/ext-vol/fastdds-minimal-sample/src/dummy.bin", std::ios::binary);
+    // std::ofstream file("/home/dungrup/ext-vol/fastdds-minimal-sample/src/dummy.bin", std::ios::binary);
+    std::ofstream file("./dummy.bin", std::ios::binary);
     if (file.is_open())
     {
         std::vector<uint8_t> buffer(DATA_SIZE, 0);
+        std::iota(buffer.begin(), buffer.end(), 0);
+        
+        std::cout << "Buffer contents:\n";
+        for (size_t i = 0; i < 512; ++i) {
+            std::cout << static_cast<int>(buffer[i]) << " ";
+            if ((i + 1) % 16 == 0) std::cout << '\n';  // Optional: print 16 per line
+        }
+
         file.write((char*)buffer.data(), DATA_SIZE);
         file.close();
     }
